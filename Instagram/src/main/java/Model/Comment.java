@@ -8,6 +8,8 @@ public class Comment {
     private String content;
     private int childrenCount;
 
+    private int likeCount;
+    
     // getter / setter
     public int getCommentId() { return commentId; }
     public void setCommentId(int commentId) { this.commentId = commentId; }
@@ -26,4 +28,7 @@ public class Comment {
 
     public int getChildrenCount() { return childrenCount; }
     public void setChildrenCount(int childrenCount) { this.childrenCount = childrenCount; }
+
+    public int getLikeCount() { return likeCount; }
+    public void setLikeCount(int likeCount) { this.likeCount = likeCount; }
 }

@@ -17,26 +17,49 @@
 </form>
 
 <script>
-    function loadComments() {
-        $.getJSON("<%=request.getContextPath()%>/comment?postId=1", function(data) {
-            let html = "";
-            data.forEach(c => {
-                html += "<p><b>" + c.memberId + ":</b> " + c.content + "</p>";
-            });
-            $("#commentList").html(html);
+const contextPath = "<%= request.getContextPath() %>";
+const postId = 1;
+function loadComments() {
+	
+    $.getJSON(contextPath + "/comment?postId=" + postId, function(data) {
+        let html = "";
+        data.forEach(c => {
+        	console.log('c', c);
+        	console.log(c.commentId);
+            html += "<p><b>" + c.memberId + ":</b> " + c.content +
+                " ❤️ <span id='like-count-" + c.commentId + "'>" + c.likeCount + "</span>" +
+                " <button onclick='likeComment(" + c.commentId + ")'>좋아요</button></p>";
         });
-    }
+        $("#commentList").html(html);
+    });
+}
 
-    $(document).ready(function() {
-        loadComments();
+function likeComment(commentId) {
+    console.log("Sending like for commentId:", commentId);
+    $.ajax({
+        url: contextPath + "/like",
+        method: "POST",
+        data: { commentId: commentId , postId: postId },
+        success: function(res) {
+            $("#like-count-" + commentId).text(res.likeCount);
+        },
+        error: function(xhr, status, error) {
+            alert("좋아요 처리 중 오류가 발생했습니다: " + error);
+        }
+    });
+}
 
-        $("#commentForm").submit(function(e) {
-            e.preventDefault();
-            $.post($(this).attr("action"), $(this).serialize(), function() {
-                loadComments();
-            });
+$(document).ready(function() {
+    loadComments();
+
+    $("#commentForm").submit(function(e) {
+        e.preventDefault();
+        $.post($(this).attr("action"), $(this).serialize(), function() {
+            loadComments();
         });
     });
+});
 </script>
+
 </body>
 </html>

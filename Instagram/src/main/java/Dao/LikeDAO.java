@@ -1,78 +1,82 @@
 package Dao;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 public class LikeDAO {
 
-    // toggle: 있으면 삭제, 없으면 추가
-    public void toggleCommentLike(int memberId, int commentId) throws SQLException {
+    // 좋아요 토글 (있으면 삭제, 없으면 추가)
+    public void toggleCommentLike(int memberId, int postId, int commentId) throws SQLException {
         try (Connection conn = DBUtil.getConnection()) {
-            String checkSql = "SELECT COUNT(*) FROM comment_like WHERE member_id = ? AND comment_id = ?";
-            PreparedStatement ps = conn.prepareStatement(checkSql);
-            ps.setInt(1, memberId);
-            ps.setInt(2, commentId);
-            ResultSet rs = ps.executeQuery();
+            // 트랜잭션 시작
+            conn.setAutoCommit(false);
 
-            boolean exists = false;
-            if (rs.next()) exists = rs.getInt(1) > 0;
-            rs.close();
-            ps.close();
+            String checkSql = "SELECT COUNT(*) FROM likes WHERE member_id = ? AND post_id = ? AND comment_id = ?";
+            try (PreparedStatement psCheck = conn.prepareStatement(checkSql)) {
+                psCheck.setInt(1, memberId);
+                psCheck.setInt(2, postId);
+                psCheck.setInt(3, commentId);
+                ResultSet rs = psCheck.executeQuery();
 
-            if (exists) {
-                removeCommentLike(memberId, commentId, conn);
-            } else {
-                addCommentLike(memberId, commentId, conn);
+                boolean exists = false;
+                if (rs.next()) exists = rs.getInt(1) > 0;
+
+                if (exists) {
+                    // 좋아요 삭제
+                    String deleteSql = "DELETE FROM likes WHERE member_id = ? AND post_id = ? AND comment_id = ?";
+                    try (PreparedStatement psDel = conn.prepareStatement(deleteSql)) {
+                        psDel.setInt(1, memberId);
+                        psDel.setInt(2, postId);
+                        psDel.setInt(3, commentId);
+                        psDel.executeUpdate();
+                    }
+
+                    // 댓글 좋아요 수 감소
+                    String updateSql = "UPDATE comment SET like_count = like_count - 1 WHERE comment_id = ?";
+                    try (PreparedStatement psUpd = conn.prepareStatement(updateSql)) {
+                        psUpd.setInt(1, commentId);
+                        psUpd.executeUpdate();
+                    }
+                } else {
+                    // 좋아요 추가
+                    String insertSql = "INSERT INTO likes (member_id, post_id, comment_id) VALUES (?, ?, ?)";
+                    try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                        psIns.setInt(1, memberId);
+                        psIns.setInt(2, postId);
+                        psIns.setInt(3, commentId);
+                        psIns.executeUpdate();
+                    }
+
+                    // 댓글 좋아요 수 증가
+                    String updateSql = "UPDATE comment SET like_count = like_count + 1 WHERE comment_id = ?";
+                    try (PreparedStatement psUpd = conn.prepareStatement(updateSql)) {
+                        psUpd.setInt(1, commentId);
+                        psUpd.executeUpdate();
+                    }
+                }
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
         }
     }
 
-    private void addCommentLike(int memberId, int commentId, Connection conn) throws SQLException {
-        String insertSql = "INSERT INTO comment_like (member_id, comment_id) VALUES (?, ?)";
-        PreparedStatement ps = conn.prepareStatement(insertSql);
-        ps.setInt(1, memberId);
-        ps.setInt(2, commentId);
-        ps.executeUpdate();
-        ps.close();
-
-        String updateSql = "UPDATE comment SET like_count = like_count + 1 WHERE comment_id = ?";
-        ps = conn.prepareStatement(updateSql);
-        ps.setInt(1, commentId);
-        ps.executeUpdate();
-        ps.close();
-    }
-
-    private void removeCommentLike(int memberId, int commentId, Connection conn) throws SQLException {
-        String deleteSql = "DELETE FROM comment_like WHERE member_id = ? AND comment_id = ?";
-        PreparedStatement ps = conn.prepareStatement(deleteSql);
-        ps.setInt(1, memberId);
-        ps.setInt(2, commentId);
-        ps.executeUpdate();
-        ps.close();
-
-        String updateSql = "UPDATE comment SET like_count = like_count - 1 WHERE comment_id = ?";
-        ps = conn.prepareStatement(updateSql);
-        ps.setInt(1, commentId);
-        ps.executeUpdate();
-        ps.close();
-    }
-
+    // 댓글 좋아요 수 조회
     public int getCommentLikeCount(int commentId) throws SQLException {
         try (Connection conn = DBUtil.getConnection()) {
             String sql = "SELECT like_count FROM comment WHERE comment_id = ?";
-            PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setInt(1, commentId);
-            ResultSet rs = ps.executeQuery();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, commentId);
+                ResultSet rs = ps.executeQuery();
 
-            int count = 0;
-            if (rs.next()) {
-                count = rs.getInt("like_count");
+                if (rs.next()) {
+                    return rs.getInt("like_count");
+                }
+                return 0;
             }
-            rs.close();
-            ps.close();
-            return count;
         }
     }
 }

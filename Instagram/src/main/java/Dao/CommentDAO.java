@@ -65,6 +65,8 @@ public class CommentDAO {
                 c.setContent(rs.getString("content"));
                 c.setChildrenCount(0); // 기본값 (추후 count 쿼리 가능)
 
+                c.setLikeCount(rs.getInt("like_count"));
+                
                 list.add(c);
             }
         } catch (Exception e) {
